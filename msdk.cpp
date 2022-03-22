@@ -109,7 +109,7 @@ uint32_t InitEncoder(
     // //禁止B帧
     ctx->mfxEncParams.mfx.GopRefDist = 1;
     // 同步模式
-    ctx->mfxEncParams.AsyncDepth = 1;
+    ctx->mfxEncParams.AsyncDepth = 0;
     ctx->mfxEncParams.mfx.NumRefFrame = 5;
     // ctx->mfxEncParams.mfx.NumSlice = 1;
     // //IdrInterval指定了IDR帧的间隔，单位为I帧；若IdrInterval=0，则每个I帧均为IDR帧。若IdrInterval=1，则每隔一个I帧为IDR帧
@@ -261,7 +261,11 @@ uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int3
 
         pitch = pData->Pitch;
         ptr = pData->Y + pInfo->CropX + pInfo->CropY * pData->Pitch;
-        memcpy(ptr, y, w * h);
+	for (i = 0; i < h; i++) {
+	    memcpy(ptr + i * pitch,y,w);
+	    y+=w;
+	}
+        //memcpy(ptr, y, w * h);
         w /= 2;
         h /= 2;
         int skip = 0;

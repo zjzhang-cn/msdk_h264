@@ -30,9 +30,6 @@ type encoder struct {
 }
 
 func newEncoder(r video.Reader, p prop.Media, params Params) (codec.ReadCloser, error) {
-	if params.KeyFrameInterval <= 0 {
-		params.KeyFrameInterval = 60
-	}
 	var context C.EncHandle
 	C.InitEncoder(C.uint16_t(p.Width), C.uint16_t(p.Height), C.uint16_t(params.BitRate/1000), 120, &context)
 	if context == C.EncHandle(nil) {
