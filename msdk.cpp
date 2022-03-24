@@ -19,36 +19,36 @@ typedef struct
     std::vector<mfxFrameSurface1> pEncSurfaces;
     mfxEncodeCtrl ctrl;
     mfxSyncPoint syncp;
-#ifdef TEST
-    // FILE* input;
+#ifdef _BIN
     FILE *out;
 #endif
 } EncodeContext;
 uint32_t DestoryEncoder(EncHandle context)
 {
     EncodeContext *ctx = (EncodeContext *)context;
-    // mfxStatus sts = MFX_ERR_NONE;
-    // while (MFX_ERR_NONE <= sts) {
-    //     for (;;) {
-    //         // Encode a frame asychronously (returns immediately)
-    //         sts = ctx->m_pmfx_enc_->EncodeFrameAsync(NULL, NULL, ctx->mfxBS, &(ctx->syncp));
-    //         if (MFX_ERR_NONE < sts && !ctx->syncp) {  // Repeat the call if warning and no output
-    //             if (MFX_WRN_DEVICE_BUSY == sts)
-    //                 MSDK_SLEEP(1);  // Wait if device is busy, then repeat the same call
-    //         } else if (MFX_ERR_NONE < sts && ctx->syncp) {
-    //             sts = MFX_ERR_NONE;  // Ignore warnings if output is available
-    //             break;
-    //         } else
-    //             break;
-    //     }
-    //     if (MFX_ERR_NONE == sts) {
-    //         sts = ctx->session->SyncOperation(ctx->syncp, 60000);  // Synchronize. Wait until encoded frame is ready
-    //         MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-    //         //sts = WriteBitStreamFrame(&mfxBS, fSink.get());
-    //         //MSDK_BREAK_ON_ERROR(sts);
-    //     }
-    // }
-
+ #if 0
+    mfxStatus sts = MFX_ERR_NONE;
+    while (MFX_ERR_NONE <= sts) {
+        for (;;) {
+            // Encode a frame asychronously (returns immediately)
+            sts = ctx->m_pmfx_enc_->EncodeFrameAsync(NULL, NULL, ctx->mfxBS, &(ctx->syncp));
+            if (MFX_ERR_NONE < sts && !ctx->syncp) {  // Repeat the call if warning and no output
+                if (MFX_WRN_DEVICE_BUSY == sts)
+                    MSDK_SLEEP(1);  // Wait if device is busy, then repeat the same call
+            } else if (MFX_ERR_NONE < sts && ctx->syncp) {
+                sts = MFX_ERR_NONE;  // Ignore warnings if output is available
+                break;
+            } else
+                break;
+        }
+        if (MFX_ERR_NONE == sts) {
+            sts = ctx->session->SyncOperation(ctx->syncp, 60000);  // Synchronize. Wait until encoded frame is ready
+            MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+            //sts = WriteBitStreamFrame(&mfxBS, fSink.get());
+            //MSDK_BREAK_ON_ERROR(sts);
+        }
+    }
+#endif
     ctx->m_pmfx_enc_->Close();
     ctx->m_pmfx_enc_.reset();
     delete ctx->session;
@@ -228,7 +228,7 @@ uint32_t InitEncoder(
     ctx->pEncSurfaces = pEncSurfaces;
     ctx->session = session;
     ctx->mfxBS = mfxBS;
-#ifdef TEST
+#ifdef _BIN
     ctx->out = OpenFile("out.h264", "wb");
     // ctx->input = OpenFile("input.yuv", "rb");
 #endif
@@ -319,8 +319,8 @@ uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int3
         sts = ctx->session->SyncOperation(ctx->syncp, 60000); // Synchronize. Wait until encoded frame is ready
         *encodedSize = ctx->mfxBS->DataLength;
         *frameType = ctx->mfxBS->FrameType;
-#ifdef TEST
-        printf("\n BS Length. %d\n", ctx->mfxBS->DataLength);
+#ifdef _BIN
+        //printf("\n BS Length. %d\n", ctx->mfxBS->DataLength);
         sts = WriteBitStreamFrame(ctx->mfxBS, ctx->out);
 #endif
         ctx->mfxBS->DataLength = 0;
