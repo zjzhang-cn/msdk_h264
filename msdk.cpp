@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include "common_utils.h"
 
@@ -328,44 +329,53 @@ uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int3
     return ctx->mfxBS->Data;
 }
 #ifdef _BIN
-int main(int argc, char **argv)
-{
-    void *ctx1 = NULL;
-    void *ctx2 = NULL;
-    void *ctx3 = NULL;
-    void *ctx4 = NULL;
-    void *ctx5 = NULL;
-    void *ctx6 = NULL;
-    for (;;)
-    {
-        mfxTime tStart, tEnd;
-        mfxGetTime(&tStart);
-        InitEncoder(3240, 1200, 3000, 30, 1, &ctx1);
-        InitEncoder(3240, 1200, 3000, 30, 1, &ctx2);
-        InitEncoder(3240, 1200, 3000, 30, 1, &ctx3);
-        InitEncoder(3240, 1200, 3000, 30, 1, &ctx4);
-        InitEncoder(3240, 1200, 3000, 30, 1, &ctx5);
-        InitEncoder(3240, 1200, 3000, 30, 1, &ctx6);
-        for (int i = 0; i < 500; i++)
-        {
-            EncodeFrame(ctx1, NULL, NULL, 0);
-            EncodeFrame(ctx2, NULL, NULL, 0);
-            EncodeFrame(ctx3, NULL, NULL, 0);
-            EncodeFrame(ctx4, NULL, NULL, 0);
-            EncodeFrame(ctx5, NULL, NULL, 0);
-            EncodeFrame(ctx6, NULL, NULL, 0);
-        }
-        DestoryEncoder(ctx1);
-        DestoryEncoder(ctx2);
-        DestoryEncoder(ctx3);
-        DestoryEncoder(ctx4);
-        DestoryEncoder(ctx5);
-        DestoryEncoder(ctx6);
-        fflush(stdout);
-        mfxGetTime(&tEnd);
-        double elapsed = TimeDiffMsec(tEnd, tStart) / 1000;
-        double fps = ((double)500 * 6 / elapsed);
-        printf("\nExecution time: %3.2f s (%3.2f fps)\n", elapsed, fps);
+int main(int argc, char** argv) {
+    void* ctx1 = 0;
+    void* ctx2 = 0;
+    void* ctx3 = 0;
+    void* ctx4 = 0;
+    void* ctx5 = 0;
+    uint8_t* yuv = (uint8_t*)malloc(3840 * 1200 * 3 >> 1);
+    uint8_t* y = yuv;
+    uint8_t* u = yuv + 3840 * 1200;
+    uint8_t* v = yuv + 3840 * 1200 + (3840 * 1200 >> 2);
+    mfxTime tStart, tEnd;
+    mfxGetTime(&tStart);
+    InitEncoder(3840, 1200, 10000, 120, &ctx1);
+    // InitEncoder(3840, 1200, 10000, 30, &ctx2);
+    // InitEncoder(3840, 1200, 10000, 30, &ctx3);
+    // InitEncoder(3840, 1200, 10000, 30, &ctx4);
+    // InitEncoder(3840, 1200, 10000, 30, &ctx5);
+    for (int i = 0; i < 1000; i++) {
+        int32_t encodedsize = 0;
+        int32_t frameType = 0;
+        uint64_t timeStamp = 0;
+        uint8_t* buf = 0;
+        memset(y, 100, 3840 * 1200);
+        memset(u, 10 + i % 50, 3840 * 100 >> 2);
+        memset(v, 50 + i % 50, 3840 * 100 >> 2);
+        buf = EncodeFrame(ctx1, y, u, v, &encodedsize,&frameType,&timeStamp, 0);
+        //printf("\nLen: %d \t Type: %x \t TimeStamp: %d", encodedsize,frameType,timeStamp);
+        //printf("\nBuf: %x %x %x %x %x %x %x %x %x ", buf[6],buf[7],buf[8],buf[9],buf[10],buf[11],buf[12],buf[13],buf[15]);
+        // buf = EncodeFrame(ctx2, y, u, v, &encodedsize, 0);
+        // buf = EncodeFrame(ctx3, y, u, v, &encodedsize, 0);
+        // buf = EncodeFrame(ctx4, y, u, v, &encodedsize, 0);
+        // buf = EncodeFrame(ctx5, y, u, v, &encodedsize, 0);
+        // printf("BUF %x SIZE %d\n",buf,encodedsize);
+        //  EncodeFrame(ctx2, 0, 0, 0);
+        //  EncodeFrame(ctx3, 0, 0, 0);
+        //  EncodeFrame(ctx4, 0, 0, 0);
+        //  EncodeFrame(ctx5, 0, 0, 0);
     }
+    DestoryEncoder(ctx1);
+    // DestoryEncoder(ctx2);
+    // DestoryEncoder(ctx3);
+    // DestoryEncoder(ctx4);
+    // DestoryEncoder(ctx5);
+    mfxGetTime(&tEnd);
+    double elapsed = TimeDiffMsec(tEnd, tStart) / 1000;
+    double fps = ((double)1000 / elapsed);
+    printf("\nExecution time: %3.2f s (%3.2f fps)\n", elapsed, fps);
+    fflush(stdout);
 }
 #endif
