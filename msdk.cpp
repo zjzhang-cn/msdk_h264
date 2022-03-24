@@ -84,6 +84,10 @@ uint32_t InitEncoder(
     // - On Windows both SW and HW libraries may present
     // - On Linux only HW library only is available
     //   If more recent API features are needed, change the version accordingly
+    mfxU32 pnFrameRateExtN;
+    mfxU32 pnFrameRateExtD;
+    ConvertFrameRate(FrameRate,&pnFrameRateExtN,&pnFrameRateExtD);
+
     mfxIMPL impl = MFX_IMPL_AUTO_ANY; // MFX_IMPL_HARDWARE
     mfxVersion ver = {{0, 1}};
     MFXVideoSession *session = new MFXVideoSession();
@@ -100,27 +104,31 @@ uint32_t InitEncoder(
     memset(&ctx->mfxEncParams, 0, sizeof(mfxVideoParam));
 
     ctx->mfxEncParams.mfx.CodecId = MFX_CODEC_AVC;
-    ctx->mfxEncParams.mfx.CodecProfile = MFX_PROFILE_AVC_CONSTRAINED_BASELINE;
+    // ctx->mfxEncParams.mfx.CodecProfile = MFX_PROFILE_AVC_CONSTRAINED_BASELINE;
+    ctx->mfxEncParams.mfx.CodecProfile = MFX_PROFILE_AVC_MAIN;    
     ctx->mfxEncParams.mfx.CodecLevel = MFX_LEVEL_AVC_31;
-    ctx->mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BEST_SPEED;
-    // ctx->mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
-    ctx->mfxEncParams.mfx.GopPicSize = FrameRate;
+    //ctx->mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BEST_SPEED;
+    ctx->mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
+    ctx->mfxEncParams.mfx.GopPicSize = FrameRate * 5;
     // //Encoder参数设置：
     // //禁止B帧
     ctx->mfxEncParams.mfx.GopRefDist = 1;
     // 同步模式
-    ctx->mfxEncParams.AsyncDepth = 0;
-    ctx->mfxEncParams.mfx.NumRefFrame = 5;
-    // ctx->mfxEncParams.mfx.NumSlice = 1;
+    ctx->mfxEncParams.AsyncDepth = 2;
+    //帧的引用计数
+    ctx->mfxEncParams.mfx.NumRefFrame = 0;
+    //每个视频帧中的切片数； 每个切片包含一个或多个小块行。 
+    ctx->mfxEncParams.mfx.NumSlice = 0;
     // //IdrInterval指定了IDR帧的间隔，单位为I帧；若IdrInterval=0，则每个I帧均为IDR帧。若IdrInterval=1，则每隔一个I帧为IDR帧
-    // ctx->mfxEncParams.mfx.IdrInterval = 1;
+    ctx->mfxEncParams.mfx.IdrInterval = 0;
     ctx->mfxEncParams.mfx.TargetKbps = Bitrate;
-    ctx->mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_VBR;
-    // ctx->mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_CQP;
-    // ctx->mfxEncParams.mfx.QPI = 31;
-    // ctx->mfxEncParams.mfx.QPP = 31;
-    ctx->mfxEncParams.mfx.FrameInfo.FrameRateExtN = FrameRate;
-    ctx->mfxEncParams.mfx.FrameInfo.FrameRateExtD = 1;
+    //ctx->mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_VBR;
+    ctx->mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_CQP;
+    //m_mfxEncParams.mfx.QPI, QPP, QPB 恒定QP（CQP）模式的I，P和B帧的量化参数（QP）
+    ctx->mfxEncParams.mfx.QPI = 31;
+    ctx->mfxEncParams.mfx.QPP = 31;
+    ctx->mfxEncParams.mfx.FrameInfo.FrameRateExtN = pnFrameRateExtN;
+    ctx->mfxEncParams.mfx.FrameInfo.FrameRateExtD = pnFrameRateExtD;
     ctx->mfxEncParams.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
     ctx->mfxEncParams.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
     ctx->mfxEncParams.mfx.FrameInfo.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
@@ -226,11 +234,12 @@ uint32_t InitEncoder(
     *context = (EncHandle *)ctx;
     return 0;
 }
-uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int32_t *encodedSize, int32_t *frameType, uint64_t *timeStamp, uint8_t ForceIDR)
+
+uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int32_t *encodedSize, int32_t *frameType, uint64_t *timeStamp, uint8_t forceIDR)
 {
     mfxStatus sts = MFX_ERR_NONE;
     EncodeContext *ctx = (EncodeContext *)context;
-    if (ForceIDR)
+    if (forceIDR)
     {
         ctx->ctrl.FrameType = MFX_FRAMETYPE_I | MFX_FRAMETYPE_REF | MFX_FRAMETYPE_IDR;
     }
@@ -261,11 +270,11 @@ uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int3
 
         pitch = pData->Pitch;
         ptr = pData->Y + pInfo->CropX + pInfo->CropY * pData->Pitch;
-	for (i = 0; i < h; i++) {
-	    memcpy(ptr + i * pitch,y,w);
-	    y+=w;
-	}
-        //memcpy(ptr, y, w * h);
+        for (i = 0; i < h; i++)
+        {
+            memcpy(ptr + i * pitch, y, w);
+            y += w;
+        }
         w /= 2;
         h /= 2;
         int skip = 0;
