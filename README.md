@@ -15,7 +15,7 @@ sudo apt-get update
 sudo apt-get install \
   intel-opencl-icd \
   intel-level-zero-gpu level-zero \
-  intel-media-va-driver-non-free libmfx1  
+  intel-media-va-driver-non-free libmfx1 libva-drm2
 sudo apt install libmfx-dev
 ```
 
