@@ -30,7 +30,7 @@ type encoder struct {
 
 func newEncoder(r video.Reader, p prop.Media, params Params) (codec.ReadCloser, error) {
 	var context C.EncHandle
-	C.InitEncoder(C.uint16_t(p.Width), C.uint16_t(p.Height), C.uint16_t(params.BitRate/1000), C.uint16_t(params.KeyFrameInterval), &context)
+	C.InitEncoder(C.uint16_t(p.Width), C.uint16_t(p.Height), C.uint16_t(params.BitRate), C.uint16_t(params.KeyFrameInterval), &context)
 	if context == C.EncHandle(nil) {
 		return nil, errors.New("failed to create msdk context")
 	}
