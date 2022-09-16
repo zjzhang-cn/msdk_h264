@@ -74,7 +74,7 @@ uint32_t QueryHardware()
 uint32_t InitEncoder(
     uint16_t Width,
     uint16_t Height,
-    uint16_t Bitrate,
+    uint16_t QP,
     uint16_t FrameRate,
     EncHandle *context)
 {
@@ -122,12 +122,13 @@ uint32_t InitEncoder(
     ctx->mfxEncParams.mfx.NumSlice = 0;
     // //IdrInterval指定了IDR帧的间隔，单位为I帧；若IdrInterval=0，则每个I帧均为IDR帧。若IdrInterval=1，则每隔一个I帧为IDR帧
     ctx->mfxEncParams.mfx.IdrInterval = 0;
-    //ctx->mfxEncParams.mfx.TargetKbps = Bitrate;
     //ctx->mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_VBR;
+    //ctx->mfxEncParams.mfx.TargetKbps = Bitrate;
+
     ctx->mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_CQP;
     //m_mfxEncParams.mfx.QPI, QPP, QPB 恒定QP（CQP）模式的I，P和B帧的量化参数（QP）
-    ctx->mfxEncParams.mfx.QPI = Bitrate % 52;
-    ctx->mfxEncParams.mfx.QPP = Bitrate % 52;
+    ctx->mfxEncParams.mfx.QPI = QP % 52;
+    ctx->mfxEncParams.mfx.QPP = QP % 52;
     ctx->mfxEncParams.mfx.FrameInfo.FrameRateExtN = pnFrameRateExtN;
     ctx->mfxEncParams.mfx.FrameInfo.FrameRateExtD = pnFrameRateExtD;
     ctx->mfxEncParams.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
@@ -250,7 +251,7 @@ uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int3
     }
     int nEncSurfIdx = GetFreeSurfaceIndex(ctx->pEncSurfaces); // Find free frame surface
     mfxFrameSurface1 *pSurface = &(ctx->pEncSurfaces[nEncSurfIdx]);
-    //复制YUV
+    //复制I420->NV12
     if (y)
     {
         mfxU16 w, h, i, pitch;
