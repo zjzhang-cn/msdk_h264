@@ -13,6 +13,10 @@ typedef struct
     std::unique_ptr<MFXVideoENCODE> m_pmfx_enc_;
     mfxVideoParam mfxEncParams;
     std::vector<mfxExtBuffer *> m_enc_ext_params_;
+    mfxExtCodingOption extendedCodingOptions;
+    mfxExtCodingOption2 extendedCodingOptions2;
+    mfxExtEncoderROI m_cfgROISetting;
+    std::vector<mfxExtBuffer *> m_ctrl_ext_params_;
     mfxBitstream *mfxBS;
     mfxU8 *surfaceBuffers;
     mfxU8 *bsBuffers;
@@ -22,6 +26,7 @@ typedef struct
 #ifdef _BIN
     FILE *out;
 #endif
+    int count;
 } EncodeContext;
 uint32_t DestoryEncoder(EncHandle context)
 {
@@ -110,14 +115,14 @@ uint32_t InitEncoder(
     ctx->mfxEncParams.mfx.CodecLevel = MFX_LEVEL_AVC_31;
     //ctx->mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BEST_SPEED;
     ctx->mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
-    ctx->mfxEncParams.mfx.GopPicSize = FrameRate * 5;
-    // //Encoder参数设置：
-    // //禁止B帧
+    ctx->mfxEncParams.mfx.GopPicSize = FrameRate * 2;
+    // Encoder参数设置：
+    // 禁止B帧
     ctx->mfxEncParams.mfx.GopRefDist = 1;
     // 同步模式
-    ctx->mfxEncParams.AsyncDepth = 2;
+    ctx->mfxEncParams.AsyncDepth = 1;
     //帧的引用计数
-    ctx->mfxEncParams.mfx.NumRefFrame = 0;
+    ctx->mfxEncParams.mfx.NumRefFrame = 1;
     //每个视频帧中的切片数； 每个切片包含一个或多个小块行。 
     ctx->mfxEncParams.mfx.NumSlice = 0;
     // //IdrInterval指定了IDR帧的间隔，单位为I帧；若IdrInterval=0，则每个I帧均为IDR帧。若IdrInterval=1，则每隔一个I帧为IDR帧
@@ -146,26 +151,26 @@ uint32_t InitEncoder(
 
     ctx->mfxEncParams.IOPattern = MFX_IOPATTERN_IN_SYSTEM_MEMORY;
 
-    mfxExtCodingOption extendedCodingOptions;
-    memset(&extendedCodingOptions, 0, sizeof(mfxExtCodingOption));
-    extendedCodingOptions.Header.BufferId = MFX_EXTBUFF_CODING_OPTION;
-    extendedCodingOptions.Header.BufferSz = sizeof(extendedCodingOptions);
-    extendedCodingOptions.AUDelimiter = MFX_CODINGOPTION_OFF;
-    extendedCodingOptions.PicTimingSEI = MFX_CODINGOPTION_OFF;
-    extendedCodingOptions.VuiNalHrdParameters = MFX_CODINGOPTION_OFF;
-    mfxExtCodingOption2 extendedCodingOptions2;
-    memset(&extendedCodingOptions2, 0, sizeof(mfxExtCodingOption));
-    extendedCodingOptions2.Header.BufferId = MFX_EXTBUFF_CODING_OPTION2;
-    extendedCodingOptions2.Header.BufferSz = sizeof(extendedCodingOptions2);
-    extendedCodingOptions2.RepeatPPS = MFX_CODINGOPTION_OFF;
-    ctx->m_enc_ext_params_.push_back((mfxExtBuffer *)&extendedCodingOptions);
-    ctx->m_enc_ext_params_.push_back((mfxExtBuffer *)&extendedCodingOptions2);
 
+    memset(&ctx->extendedCodingOptions, 0, sizeof(mfxExtCodingOption));
+    ctx->extendedCodingOptions.Header.BufferId = MFX_EXTBUFF_CODING_OPTION;
+    ctx->extendedCodingOptions.Header.BufferSz = sizeof(ctx->extendedCodingOptions);
+    ctx->extendedCodingOptions.AUDelimiter = MFX_CODINGOPTION_OFF;
+    ctx->extendedCodingOptions.PicTimingSEI = MFX_CODINGOPTION_OFF;
+    ctx->extendedCodingOptions.VuiNalHrdParameters = MFX_CODINGOPTION_OFF;
+
+    memset(&ctx->extendedCodingOptions2, 0, sizeof(mfxExtCodingOption));
+    ctx->extendedCodingOptions2.Header.BufferId = MFX_EXTBUFF_CODING_OPTION2;
+    ctx->extendedCodingOptions2.Header.BufferSz = sizeof(ctx->extendedCodingOptions2);
+    ctx->extendedCodingOptions2.RepeatPPS = MFX_CODINGOPTION_OFF;  
+    ctx->m_enc_ext_params_.push_back((mfxExtBuffer *)&(ctx->extendedCodingOptions));
+    ctx->m_enc_ext_params_.push_back((mfxExtBuffer *)&(ctx->extendedCodingOptions2));
     if (!ctx->m_enc_ext_params_.empty())
     {
         ctx->mfxEncParams.ExtParam = &ctx->m_enc_ext_params_[0]; // vector is stored linearly in memory
         ctx->mfxEncParams.NumExtParam = (mfxU16)ctx->m_enc_ext_params_.size();
     }
+
 
     // Validate video encode parameters (optional)
     // - In this example the validation result is written to same structure
@@ -229,18 +234,51 @@ uint32_t InitEncoder(
     ctx->pEncSurfaces = pEncSurfaces;
     ctx->session = session;
     ctx->mfxBS = mfxBS;
+
+
+ 
+    memset(&ctx->m_cfgROISetting, 0, sizeof(ctx->m_cfgROISetting));
+    ctx->m_cfgROISetting.Header.BufferId = MFX_EXTBUFF_ENCODER_ROI;;
+    ctx->m_cfgROISetting.Header.BufferSz = sizeof(ctx->m_cfgROISetting);
+
+    ctx->m_ctrl_ext_params_.push_back((mfxExtBuffer *)&ctx->m_cfgROISetting);
+    ctx->ctrl.ExtParam= &ctx->m_ctrl_ext_params_[0];
+    ctx->ctrl.NumExtParam= (mfxU16)ctx->m_ctrl_ext_params_.size();
+    SetROI(ctx);
+
 #ifdef _BIN
     ctx->out = OpenFile("out.h264", "wb");
-    // ctx->input = OpenFile("input.yuv", "rb");
 #endif
     *context = (EncHandle *)ctx;
     return 0;
 }
 
+void SetROI(EncHandle context){
+    EncodeContext *ctx = (EncodeContext *)context;
+    ctx->m_cfgROISetting.NumROI = 1;
+    ctx->m_cfgROISetting.ROIMode = MFX_ROI_MODE_QP_DELTA;
+    ctx->m_cfgROISetting.ROI[0].Left = 160;
+    ctx->m_cfgROISetting.ROI[0].Right = 640;
+    ctx->m_cfgROISetting.ROI[0].Top = 160;
+    ctx->m_cfgROISetting.ROI[0].Bottom = 640;
+    ctx->m_cfgROISetting.ROI[0].DeltaQP = -51;
+    // ctx->m_cfgROISetting.ROI[0].Priority = 3;
+
+}
 uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int32_t *encodedSize, int32_t *frameType, uint64_t *timeStamp, uint8_t forceIDR)
 {
+
     mfxStatus sts = MFX_ERR_NONE;
     EncodeContext *ctx = (EncodeContext *)context;
+    // ctx->count++;
+    // if (ctx->count%100==0){
+    //     if (ctx->m_cfgROISetting.NumROI ==1){
+    //         ctx->m_cfgROISetting.NumROI =0;
+    //     }else{
+    //         ctx->m_cfgROISetting.NumROI =1;
+    //     }
+    // }
+
     if (forceIDR)
     {
         ctx->ctrl.FrameType = MFX_FRAMETYPE_I | MFX_FRAMETYPE_REF | MFX_FRAMETYPE_IDR;
@@ -321,7 +359,7 @@ uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int3
         *encodedSize = ctx->mfxBS->DataLength;
         *frameType = ctx->mfxBS->FrameType;
 #ifdef _BIN
-        //printf("\n BS Length. %d\n", ctx->mfxBS->DataLength);
+        printf("\n BS Length. %d\n", ctx->mfxBS->DataLength);
         sts = WriteBitStreamFrame(ctx->mfxBS, ctx->out);
 #endif
         ctx->mfxBS->DataLength = 0;
