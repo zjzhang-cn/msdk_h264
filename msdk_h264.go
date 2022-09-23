@@ -37,7 +37,7 @@ func newEncoder(r video.Reader, p prop.Media, params Params) (codec.ReadCloser, 
 
 	e := &encoder{
 		context:  context,
-		r:        video.ToI420(r),
+		r:        r,
 		closed:   false,
 		forceIDR: 0,
 	}
@@ -60,11 +60,10 @@ func (e *encoder) Read() ([]byte, func(), error) {
 	var frameSize C.int
 	var frameType C.int
 	var timeStamp C.uint64_t
-
 	s := C.EncodeFrame(e.context,
 		(*C.uchar)(&yuvImg.Y[0]),
 		(*C.uchar)(&yuvImg.Cb[0]),
-		(*C.uchar)(&yuvImg.Cr[0]),
+		nil,
 		&frameSize, &frameType, &timeStamp, C.uint8_t(e.forceIDR))
 	e.forceIDR = 0
 	encoded := C.GoBytes(unsafe.Pointer(s), frameSize)

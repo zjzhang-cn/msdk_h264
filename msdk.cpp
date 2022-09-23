@@ -158,6 +158,7 @@ uint32_t InitEncoder(
     ctx->extendedCodingOptions.AUDelimiter = MFX_CODINGOPTION_OFF;
     ctx->extendedCodingOptions.PicTimingSEI = MFX_CODINGOPTION_OFF;
     ctx->extendedCodingOptions.VuiNalHrdParameters = MFX_CODINGOPTION_OFF;
+    ctx->extendedCodingOptions.MaxDecFrameBuffering = 1;
 
     memset(&ctx->extendedCodingOptions2, 0, sizeof(mfxExtCodingOption));
     ctx->extendedCodingOptions2.Header.BufferId = MFX_EXTBUFF_CODING_OPTION2;
@@ -244,7 +245,7 @@ uint32_t InitEncoder(
     ctx->m_ctrl_ext_params_.push_back((mfxExtBuffer *)&ctx->m_cfgROISetting);
     ctx->ctrl.ExtParam= &ctx->m_ctrl_ext_params_[0];
     ctx->ctrl.NumExtParam= (mfxU16)ctx->m_ctrl_ext_params_.size();
-    SetROI(ctx);
+    //SetROI(ctx);
 
 #ifdef _BIN
     ctx->out = OpenFile("out.h264", "wb");
@@ -290,13 +291,11 @@ uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int3
     int nEncSurfIdx = GetFreeSurfaceIndex(ctx->pEncSurfaces); // Find free frame surface
     mfxFrameSurface1 *pSurface = &(ctx->pEncSurfaces[nEncSurfIdx]);
     //复制I420->NV12
-    if (y)
-    {
+    if (y){
         mfxU16 w, h, i, pitch;
         mfxU8 *ptr;
         mfxFrameInfo *pInfo = &pSurface->Info;
         mfxFrameData *pData = &pSurface->Data;
-
         if (pInfo->CropH > 0 && pInfo->CropW > 0)
         {
             w = pInfo->CropW;
@@ -310,29 +309,51 @@ uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int3
 
         pitch = pData->Pitch;
         ptr = pData->Y + pInfo->CropX + pInfo->CropY * pData->Pitch;
-        for (i = 0; i < h; i++)
-        {
-            memcpy(ptr + i * pitch, y, w);
-            y += w;
-        }
-        w /= 2;
-        h /= 2;
-        int skip = 0;
+        memcpy(ptr, y, w*h);
         ptr = pData->UV + pInfo->CropX + (pInfo->CropY / 2) * pitch;
-        for (mfxU16 i = 0; i < h; i++)
-        {
-            for (mfxU16 j = 0; j < w; j++)
-            {
-                ptr[i * pitch + j * 2 + 0] = u[skip];
-                ptr[i * pitch + j * 2 + 1] = v[skip];
-                skip++;
-            }
-        }
+        memcpy(ptr, u, w*h/2);
     }
+    // if (y)
+    // {
+    //     mfxU16 w, h, i, pitch;
+    //     mfxU8 *ptr;
+    //     mfxFrameInfo *pInfo = &pSurface->Info;
+    //     mfxFrameData *pData = &pSurface->Data;
+    //     if (pInfo->CropH > 0 && pInfo->CropW > 0)
+    //     {
+    //         w = pInfo->CropW;
+    //         h = pInfo->CropH;
+    //     }
+    //     else
+    //     {
+    //         w = pInfo->Width;
+    //         h = pInfo->Height;
+    //     }
+    //     pitch = pData->Pitch;
+    //     ptr = pData->Y + pInfo->CropX + pInfo->CropY * pData->Pitch;
+    //     for (i = 0; i < h; i++)
+    //     {
+    //         memcpy(ptr + i * pitch, y, w);
+    //         y += w;
+    //     }
+    //     w /= 2;
+    //     h /= 2;
+    //     int skip = 0;
+    //     ptr = pData->UV + pInfo->CropX + (pInfo->CropY / 2) * pitch;
+    //     for (mfxU16 i = 0; i < h; i++)
+    //     {
+    //         for (mfxU16 j = 0; j < w; j++)
+    //         {
+    //             ptr[i * pitch + j * 2 + 0] = u[skip];
+    //             ptr[i * pitch + j * 2 + 1] = v[skip];
+    //             skip++;
+    //         }
+    //     }
+    // }
     for (;;)
     {
         // Encode a frame asychronously (returns immediately)
-        sts = ctx->m_pmfx_enc_->EncodeFrameAsync(&(ctx->ctrl), pSurface, ctx->mfxBS, &(ctx->syncp));
+        sts = ctx->m_pmfx_enc_->EncodeFrameAsync(NULL, pSurface, ctx->mfxBS, &(ctx->syncp));
 
         if (MFX_ERR_NONE < sts && !ctx->syncp)
         { // Repeat the call if warning and no output
@@ -359,7 +380,7 @@ uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int3
         *encodedSize = ctx->mfxBS->DataLength;
         *frameType = ctx->mfxBS->FrameType;
 #ifdef _BIN
-        printf("\n BS Length. %d\n", ctx->mfxBS->DataLength);
+        //printf("\n BS Length. %d\n", ctx->mfxBS->DataLength);
         sts = WriteBitStreamFrame(ctx->mfxBS, ctx->out);
 #endif
         ctx->mfxBS->DataLength = 0;
@@ -368,19 +389,21 @@ uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int3
     return ctx->mfxBS->Data;
 }
 #ifdef _BIN
+#define HEIGHT  1080
+#define WIDTH   1920
 int main(int argc, char** argv) {
     void* ctx1 = 0;
     void* ctx2 = 0;
     void* ctx3 = 0;
     void* ctx4 = 0;
     void* ctx5 = 0;
-    uint8_t* yuv = (uint8_t*)malloc(3840 * 1200 * 3 >> 1);
+    uint8_t* yuv = (uint8_t*)malloc(WIDTH * HEIGHT * 3 >> 1);
     uint8_t* y = yuv;
-    uint8_t* u = yuv + 3840 * 1200;
-    uint8_t* v = yuv + 3840 * 1200 + (3840 * 1200 >> 2);
+    uint8_t* u = yuv + WIDTH * HEIGHT;
+    uint8_t* v = yuv + WIDTH * HEIGHT + (WIDTH * HEIGHT >> 2);
     mfxTime tStart, tEnd;
     mfxGetTime(&tStart);
-    InitEncoder(3840, 1200, 10000, 120, &ctx1);
+    InitEncoder(WIDTH, HEIGHT, 31, 120, &ctx1);
     // InitEncoder(3840, 1200, 10000, 30, &ctx2);
     // InitEncoder(3840, 1200, 10000, 30, &ctx3);
     // InitEncoder(3840, 1200, 10000, 30, &ctx4);
@@ -390,9 +413,9 @@ int main(int argc, char** argv) {
         int32_t frameType = 0;
         uint64_t timeStamp = 0;
         uint8_t* buf = 0;
-        memset(y, 100, 3840 * 1200);
-        memset(u, 10 + i % 50, 3840 * 100 >> 2);
-        memset(v, 50 + i % 50, 3840 * 100 >> 2);
+        memset(y, 100, WIDTH * HEIGHT);
+        //memset(u, 10 + i % 50, 3840 * 100 >> 2);
+        //memset(v, 50 + i % 50, 3840 * 100 >> 2);
         buf = EncodeFrame(ctx1, y, u, v, &encodedsize,&frameType,&timeStamp, 0);
         //printf("\nLen: %d \t Type: %x \t TimeStamp: %d", encodedsize,frameType,timeStamp);
         //printf("\nBuf: %x %x %x %x %x %x %x %x %x ", buf[6],buf[7],buf[8],buf[9],buf[10],buf[11],buf[12],buf[13],buf[15]);
@@ -414,7 +437,7 @@ int main(int argc, char** argv) {
     mfxGetTime(&tEnd);
     double elapsed = TimeDiffMsec(tEnd, tStart) / 1000;
     double fps = ((double)1000 / elapsed);
-    printf("\nExecution time: %3.2f s (%3.2f fps)\n", elapsed, fps);
+    printf("\n%dx%d  Execution time: %3.2f s (%3.2f fps)\n", WIDTH,HEIGHT,elapsed, fps);
     fflush(stdout);
 }
 #endif
