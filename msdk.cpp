@@ -26,6 +26,7 @@ typedef struct
 #ifdef _BIN
     FILE *out;
 #endif
+    int qp;
     int count;
 } EncodeContext;
 uint32_t DestoryEncoder(EncHandle context)
@@ -132,6 +133,7 @@ uint32_t InitEncoder(
 
     ctx->mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_CQP;
     //m_mfxEncParams.mfx.QPI, QPP, QPB 恒定QP（CQP）模式的I，P和B帧的量化参数（QP）
+    ctx->qp=QP % 52;
     ctx->mfxEncParams.mfx.QPI = QP % 52;
     ctx->mfxEncParams.mfx.QPP = QP % 52;
     ctx->mfxEncParams.mfx.FrameInfo.FrameRateExtN = pnFrameRateExtN;
@@ -240,11 +242,13 @@ uint32_t InitEncoder(
     memset(&ctx->m_cfgROISetting, 0, sizeof(ctx->m_cfgROISetting));
     ctx->m_cfgROISetting.Header.BufferId = MFX_EXTBUFF_ENCODER_ROI;;
     ctx->m_cfgROISetting.Header.BufferSz = sizeof(ctx->m_cfgROISetting);
+    ctx->m_cfgROISetting.NumROI = 0;
+    ctx->m_cfgROISetting.ROIMode = MFX_ROI_MODE_QP_DELTA;
 
     ctx->m_ctrl_ext_params_.push_back((mfxExtBuffer *)&ctx->m_cfgROISetting);
     ctx->ctrl.ExtParam= &ctx->m_ctrl_ext_params_[0];
     ctx->ctrl.NumExtParam= (mfxU16)ctx->m_ctrl_ext_params_.size();
-    SetROI(ctx);
+    //SetROI(ctx);
 
 #ifdef _BIN
     ctx->out = OpenFile("out.h264", "wb");
@@ -253,14 +257,19 @@ uint32_t InitEncoder(
     return 0;
 }
 
-void SetROI(EncHandle context){
+void SetROI(EncHandle context,int l,int r,int t,int b){
     EncodeContext *ctx = (EncodeContext *)context;
     ctx->m_cfgROISetting.NumROI = 1;
-    ctx->m_cfgROISetting.ROIMode = MFX_ROI_MODE_QP_DELTA;
-    ctx->m_cfgROISetting.ROI[0].Left = 160;
-    ctx->m_cfgROISetting.ROI[0].Right = 640;
-    ctx->m_cfgROISetting.ROI[0].Top = 160;
-    ctx->m_cfgROISetting.ROI[0].Bottom = 640;
+    //ctx->m_cfgROISetting.ROIMode = MFX_ROI_MODE_QP_DELTA;
+    // ctx->m_cfgROISetting.ROI[0].Left = 160;
+    // ctx->m_cfgROISetting.ROI[0].Right = 640;
+    // ctx->m_cfgROISetting.ROI[0].Top = 160;
+    // ctx->m_cfgROISetting.ROI[0].Bottom = 640;
+    // ctx->m_cfgROISetting.ROI[0].DeltaQP = -51;
+    ctx->m_cfgROISetting.ROI[0].Left = l;
+    ctx->m_cfgROISetting.ROI[0].Right = r;
+    ctx->m_cfgROISetting.ROI[0].Top = t;
+    ctx->m_cfgROISetting.ROI[0].Bottom = b;
     ctx->m_cfgROISetting.ROI[0].DeltaQP = -51;
     // ctx->m_cfgROISetting.ROI[0].Priority = 3;
 
@@ -359,7 +368,7 @@ uint8_t *EncodeFrame(EncHandle context, uint8_t *y, uint8_t *u, uint8_t *v, int3
         *encodedSize = ctx->mfxBS->DataLength;
         *frameType = ctx->mfxBS->FrameType;
 #ifdef _BIN
-        printf("\n BS Length. %d\n", ctx->mfxBS->DataLength);
+        //printf("\n BS Length. %d\n", ctx->mfxBS->DataLength);
         sts = WriteBitStreamFrame(ctx->mfxBS, ctx->out);
 #endif
         ctx->mfxBS->DataLength = 0;

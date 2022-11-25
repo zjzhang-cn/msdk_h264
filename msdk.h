@@ -14,7 +14,7 @@ uint32_t InitEncoder(
     EncHandle *context);
 uint8_t* EncodeFrame(EncHandle context, uint8_t* y, uint8_t* u, uint8_t* v, int32_t* encodedSize, int32_t* frameType, uint64_t* timeStamp, uint8_t ForceIDR);
 uint32_t DestoryEncoder(EncHandle);
-void SetROI(EncHandle context);
+void SetROI(EncHandle context,int l,int r,int t,int b);
 #ifdef __cplusplus
 }
 #endif

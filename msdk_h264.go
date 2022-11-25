@@ -12,6 +12,7 @@ import (
 	"errors"
 	"image"
 	"io"
+	"os"
 	"sync"
 	"unsafe"
 
@@ -60,7 +61,16 @@ func (e *encoder) Read() ([]byte, func(), error) {
 	var frameSize C.int
 	var frameType C.int
 	var timeStamp C.uint64_t
-
+	// if getEnv("_S") != "" {
+	// 	_L, _ := strconv.Atoi(getEnv("_L"))
+	// 	_R, _ := strconv.Atoi(getEnv("_R"))
+	// 	_T, _ := strconv.Atoi(getEnv("_T"))
+	// 	_B, _ := strconv.Atoi(getEnv("_B"))
+	// 	if _L < _R && _T < _B {
+	// 		C.SetROI(e.context, C.int(_L), C.int(_R), C.int(_T), C.int(_B))
+	// 	}
+	// 	os.Setenv("_S", "")
+	// }
 	s := C.EncodeFrame(e.context,
 		(*C.uchar)(&yuvImg.Y[0]),
 		(*C.uchar)(&yuvImg.Cb[0]),
@@ -73,6 +83,13 @@ func (e *encoder) Read() ([]byte, func(), error) {
 
 func (e *encoder) SetBitRate(b int) error {
 	panic("SetBitRate is not implemented")
+}
+func getEnv(key string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+
+	return ""
 }
 
 func (e *encoder) ForceKeyFrame() error {
