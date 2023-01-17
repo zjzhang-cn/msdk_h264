@@ -31,7 +31,11 @@ type encoder struct {
 
 func newEncoder(r video.Reader, p prop.Media, params Params) (codec.ReadCloser, error) {
 	var context C.EncHandle
-	C.InitEncoder(C.uint16_t(p.Width), C.uint16_t(p.Height), C.uint16_t(params.BitRate), C.uint16_t(params.KeyFrameInterval), &context)
+	if p.FrameRate == 0 {
+		p.FrameRate = 30
+	}
+	qp := params.BitRate % 52
+	C.InitEncoder(C.uint16_t(p.Width), C.uint16_t(p.Height), C.uint16_t(qp), C.uint16_t(p.FrameRate), &context)
 	if context == C.EncHandle(nil) {
 		return nil, errors.New("failed to create msdk context")
 	}
@@ -81,9 +85,7 @@ func (e *encoder) Read() ([]byte, func(), error) {
 	return encoded, func() {}, err
 }
 
-func (e *encoder) SetBitRate(b int) error {
-	panic("SetBitRate is not implemented")
-}
+
 func getEnv(key string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value
@@ -110,4 +112,7 @@ func (e *encoder) Close() error {
 	C.DestoryEncoder(e.context)
 	e.closed = true
 	return nil
+}
+func (e *encoder) Controller() codec.EncoderController {
+	return e
 }
